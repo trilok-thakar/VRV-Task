@@ -34,21 +34,33 @@ def most_frequently_accessed_endpoint(log_file_path):
     else:
         return None
 
-def detect_suspicious_activity(log_file_path, threshold=10):
+def detect_suspicious_activity(log_file_path, threshold=5):  
     failed_login_count = defaultdict(int)
-    failed_login_pattern = re.compile(r'(\d{1,3}\.){3}\d{1,3}.*(401|Invalid credentials)')
+    failed_login_pattern = re.compile(
+        r'(?P<ip>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}) - - \[.*\] ".*" 401 .*"Invalid credentials"'
+    )
 
     with open(log_file_path, 'r') as file:
         for line in file:
             failed_login_match = failed_login_pattern.search(line)
             if failed_login_match:
-                ip_address = failed_login_match.group(0).split()[0]  # Extract IP address
+                ip_address = failed_login_match.group('ip') 
                 failed_login_count[ip_address] += 1
 
-    # Filter IPs that exceed the threshold
-    flagged_ips = {ip: count for ip, count in failed_login_count.items() if count > threshold}
+  
+    flagged_ips = {ip: count for ip, count in failed_login_count.items() if count >= threshold}
 
     return flagged_ips
+
+def display_suspicious_activity(flagged_ips):
+    if flagged_ips:
+        print("Suspicious Activity Detected:")
+        print("IP Address           Failed Login Attempts")
+        print("--------------------------------------------------")
+        for ip, count in flagged_ips.items():
+            print(f"{ip:<20} {count}")
+    else:
+        print("No suspicious activity detected.")
 
 def save_results_to_csv(ip_counts, most_accessed_endpoint, suspicious_activity, filename='log_analysis_results.csv'):
     with open(filename, 'w', newline='') as csvfile:
@@ -94,12 +106,14 @@ def print_results(ip_counts, most_accessed_endpoint, suspicious_activity):
 
 if __name__ == "__main__":
     log_file_path = 'D:\VRV\sample.log'
+    threshold = 5 
+
+    flagged_ips = detect_suspicious_activity(log_file_path, threshold)
+    display_suspicious_activity(flagged_ips)
     ip_counts = count_requests_per_ip(log_file_path)
 
     most_accessed_endpoint = most_frequently_accessed_endpoint(log_file_path)
 
     suspicious_activity = detect_suspicious_activity(log_file_path, threshold=10)
-
-    print_results(ip_counts, most_accessed_endpoint, suspicious_activity)
 
     save_results_to_csv(ip_counts, most_accessed_endpoint, suspicious_activity)
